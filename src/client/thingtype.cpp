@@ -623,12 +623,6 @@ void ThingType::unserialize(const uint16_t clientId, const ThingCategory categor
             case ThingAttrCloth: m_clothSlot = fin->getU16(); break;
             case ThingAttrLensHelp: m_lensHelp = fin->getU16(); break;
             case ThingAttrDefaultAction: m_defaultAction = static_cast<PLAYER_ACTION>(fin->getU16()); break;
-            case ThingAttrUsable:
-                // HOKAGE: no .dat 8.54 editado (formato do OTClient 2013) o atributo
-                // "Usable" (34) traz um U16. Sem ler esse valor o arquivo desalinha.
-                if (g_game.getClientVersion() < 1000)
-                    fin->getU16();
-                break;
         }
     }
 
