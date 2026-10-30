@@ -1,0 +1,65 @@
+name: Hokage Client Build
+
+on:
+  push:
+    branches: [main]
+    paths-ignore: ["**.md", "docs/**"]
+  workflow_dispatch:
+
+concurrency:
+  group: hokage-build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-linux:
+    name: Build - Linux
+    permissions:
+      contents: read
+      packages: write
+    uses: ./.github/workflows/reusable-build-linux.yml
+    secrets: inherit
+
+  build-windows:
+    name: Build - Windows
+    permissions:
+      contents: read
+      packages: write
+    uses: ./.github/workflows/reusable-build-windows.yml
+    secrets: inherit
+
+  build-macos:
+    name: Build - macOS
+    permissions:
+      contents: read
+      pull-requests: read
+    uses: ./.github/workflows/reusable-build-macos.yml
+    secrets: inherit
+
+  release:
+    name: Publicar build (nightly)
+    needs: [build-linux, build-windows, build-macos]
+    if: ${{ always() && (needs.build-windows.result == 'success' || needs.build-macos.result == 'success' || needs.build-linux.result == 'success') }}
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: art
+      - name: Empacotar
+        run: |
+          set -euo pipefail
+          mkdir -p out
+          ls -R art | head -50
+          if [ -d art/windows-cmake-release ]; then (cd art/windows-cmake-release && zip -qr ../../out/hokage-client-windows.zip .); fi
+          if [ -d art/linux-linux-release ]; then (cd art/linux-linux-release && zip -qr ../../out/hokage-client-linux.zip .); fi
+          for d in art/otclient-macos-*; do [ -d "$d" ] && cp "$d"/*.zip out/hokage-client-macos.zip; done
+          ls -la out
+      - name: Publicar release nightly
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh release delete nightly --repo "$GITHUB_REPOSITORY" --yes --cleanup-tag || true
+          gh release create nightly out/* --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
+            --title "Nightly ${GITHUB_SHA::7}" --notes "Build automatico do commit ${GITHUB_SHA}." --prerelease
